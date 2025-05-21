@@ -29,10 +29,18 @@ jobs:
     - name: 检查服务器配置
       run: |
         echo "::group::🖥️ 服务器资源详情"
-        lscpu | grep -E 'Model name|Socket|Thread'
+        echo "⚠️ 重要提示"
+        echo "若服务器性能不足请立即取消运行！已知兼容型号：Ryzen 8370C/8171M"
+        echo "::group::🖥️ 服务器资源详情"
+        echo "--------------------------CPU信息--------------------------"
+        echo "CPU物理数量:$(cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l)"
+        echo "CPU型号: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"
         echo "CPU核心数: $(nproc)"
-        free -h
+        echo "--------------------------内存信息--------------------------"
+        echo "内存总量: $(free -h | awk '/Mem/{print $2}')"
+        echo "--------------------------硬盘信息--------------------------"
         df -Th
+        echo "::endgroup::"
         echo "::endgroup::"
 
     - name: 初始化构建环境
