@@ -93,14 +93,14 @@ jobs:
         ./scripts/feeds install -a
         echo "::endgroup::"
 
-    - name: 应用自定义配置
+    - name: 应用自定义配置diy-part2.sh
         [ -e files ] && mv files openwrt/files
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
 
-    - name: 下载依赖
+    - name: 下载依赖和软件包
       run: |
         cd openwrt
         make defconfig
