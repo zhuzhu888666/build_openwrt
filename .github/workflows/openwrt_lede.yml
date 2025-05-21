@@ -20,7 +20,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest  # 修正为有效运行器类型
 
     steps:
     - name: Checkout
@@ -35,9 +35,7 @@ jobs:
         df -Th
         echo "::endgroup::"
 
-    - name: 初始化环境
-      env:
-        DEBIAN_FRONTEND: noninteractive
+    - name: 初始化构建环境
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* \
           /usr/share/dotnet \
@@ -61,7 +59,6 @@ jobs:
         sudo chown -R $USER:$GROUPS /workdir
 
     - name: 克隆源代码
-      working-directory: /workdir
       run: |
         echo "::group::📦 存储空间信息"
         df -hT $PWD
@@ -71,13 +68,11 @@ jobs:
 
     - name: 加载自定义配置
       run: |
-        echo "::group::🚀 执行自定义脚本 Part1"
-        
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        chmod +x $DIY_P1_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
-        echo "::endgroup::"
+          echo "::group::🚀 执行自定义脚本diy-part1.sh"
+          chmod +x ../$DIY_P1_SH
+          cp ../$FEEDS_CONF openwrt/feeds.conf.default
+          cd openwrt && ../$DIY_P1_SH
+          echo "::endgroup::"
 
     - name: 更新 feeds
       run: |
@@ -93,17 +88,20 @@ jobs:
         ./scripts/feeds install -a
         echo "::endgroup::"
 
-    - name: 应用自定义配置diy-part2.sh
-        [ -e files ] && mv files openwrt/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
-        chmod +x $DIY_P2_SH
-        cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
+    - name: 应用自定义配置
+      run: |
+        if [ -f "../$DIY_P2_SH" ]; then
+          echo "::group::🚀 执行自定义脚本diy-part2.sh"
+          chmod +x ../$DIY_P2_SH
+          cd openwrt && ../$DIY_P2_SH
+          echo "::endgroup::"
+        fi
+        cp ../$CONFIG_FILE .config
+        make defconfig
 
-    - name: 下载依赖和软件包
+    - name: 下载依赖
       run: |
         cd openwrt
-        make defconfig
         echo "::group::📦 下载软件包"
         make download -j$(($(nproc) + 1)) || make download -j1 V=s
         echo "::endgroup::"
