@@ -102,6 +102,7 @@ jobs:
     - name: 下载依赖
       run: |
         cd openwrt
+        make defconfig
         echo "::group::📦 下载软件包"
         make download -j$(($(nproc) + 1)) || make download -j1 V=s
         echo "::endgroup::"
