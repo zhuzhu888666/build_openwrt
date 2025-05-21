@@ -1,36 +1,158 @@
-# This is a basic workflow to help you get started with Actions
+name: 编译immortalwrt的源
 
-name: CI
-
-# Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-  # Allows you to run this workflow manually from the Actions tab
+  repository_dispatch:
   workflow_dispatch:
+    inputs:
+      ssh:
+        description: 'SSH connection to Actions'
+        required: false
+        default: 'false'
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+env:
+  URL: https://github.com/immortalwrt/immortalwrt
+  BRANCH: master
+  FEEDS_CONF: feeds.conf.default
+  CONFIG_FILE: .config
+  DIY_P1_SH: diy-part1.sh
+  DIY_P2_SH: diy-part2.sh
+  TZ: Asia/Shanghai
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # 修正为有效运行器类型
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4  # 使用最新稳定版本
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+    - name: 检查服务器配置
+      run: |
+        echo "::group::🖥️ 服务器资源详情"
+        lscpu | grep -E 'Model name|Socket|Thread'
+        echo "CPU核心数: $(nproc)"
+        free -h
+        df -Th
+        echo "::endgroup::"
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+    - name: 初始化构建环境
+      run: |
+        sudo rm -rf /etc/apt/sources.list.d/* \
+          /usr/share/dotnet \
+          /usr/local/lib/android \
+          /opt/ghc \
+          /opt/hostedtoolcache/CodeQL
+        sudo docker system prune -a -f
+        sudo apt-get -qq update
+        sudo apt-get -qq install -y \
+          ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext \
+          gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 \
+          libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev \
+          libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev \
+          libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch \
+          pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils \
+          rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
+          vim wget xmlto xxd zlib1g-dev
+        sudo timedatectl set-timezone "$TZ"
+        sudo mkdir -p /workdir
+        sudo chown -R $USER:$GROUPS /workdir
+
+    - name: 克隆源代码
+      run: |
+        echo "::group::📦 存储空间信息"
+        df -hT $PWD
+        echo "::endgroup::"
+        git clone --depth 1 $URL -b $BRANCH openwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
+
+    - name: 加载自定义配置
+      run: |
+        if [ -f "../$DIY_P1_SH" ]; then
+          echo "::group::🚀 执行自定义脚本 Part1"
+          chmod +x ../$DIY_P1_SH
+          cp ../$FEEDS_CONF openwrt/feeds.conf.default
+          cd openwrt && ../$DIY_P1_SH
+          echo "::endgroup::"
+        fi
+
+    - name: 更新 feeds
+      run: |
+        cd openwrt
+        echo "::group::🔄 更新软件源"
+        ./scripts/feeds update -a
+        echo "::endgroup::"
+
+    - name: 安装 feeds
+      run: |
+        cd openwrt
+        echo "::group::📥 安装软件包"
+        ./scripts/feeds install -a
+        echo "::endgroup::"
+
+    - name: 应用自定义配置
+      run: |
+        if [ -f "../$DIY_P2_SH" ]; then
+          echo "::group::🚀 执行自定义脚本 Part2"
+          chmod +x ../$DIY_P2_SH
+          cd openwrt && ../$DIY_P2_SH
+          echo "::endgroup::"
+        fi
+        cp ../$CONFIG_FILE .config
+        make defconfig
+
+    - name: 下载依赖
+      run: |
+        cd openwrt
+        echo "::group::📦 下载软件包"
+        make download -j$(($(nproc) + 1)) || make download -j1 V=s
+        echo "::endgroup::"
+        echo "::group::🔍 检查无效文件"
+        find dl -size -1024c -exec ls -l {} \;
+        find dl -size -1024c -exec rm -f {} \;
+        echo "::endgroup::"
+
+    - name: 编译固件
+      run: |
+        cd openwrt
+        echo "::group::🏗️ 编译日志 (详细模式)"
+        make -j$(($(nproc) + 1)) || make -j1 V=s
+        echo "::endgroup::"
+      continue-on-error: true  # 允许失败以捕获日志
+
+    - name: 收集编译结果
+      if: ${{ always() }}
+      run: |
+        echo "::group::📊 最终存储空间使用"
+        df -hT
+        echo "::endgroup::"
+        
+        cd openwrt/bin/targets/*/*
+        echo "::group::📁 生成文件列表"
+        find . -type f -printf "%T+ %p\n" | sort
+        echo "::endgroup::"
+        
+        # 重命名带日期时间戳的文件
+        for f in *; do
+          mv "$f" "$(date +%Y%m%d)-${f}"
+        done
+
+    - name: 上传编译结果
+      uses: actions/upload-artifact@v4
+      if: ${{ always() }}
+      with:
+        name: firmware-${{ github.run_id }}
+        path: openwrt/bin/targets/*/*/*
+        retention-days: 3
+
+    - name: 失败通知
+      if: ${{ failure() }}
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: "❌ 编译失败！请检查 [工作流运行](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          })
