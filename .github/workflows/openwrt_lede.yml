@@ -20,7 +20,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # 修正为有效运行器类型
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout
@@ -35,7 +35,9 @@ jobs:
         df -Th
         echo "::endgroup::"
 
-    - name: 初始化构建环境
+    - name: 初始化环境
+      env:
+        DEBIAN_FRONTEND: noninteractive
       run: |
         sudo rm -rf /etc/apt/sources.list.d/* \
           /usr/share/dotnet \
@@ -59,6 +61,7 @@ jobs:
         sudo chown -R $USER:$GROUPS /workdir
 
     - name: 克隆源代码
+      working-directory: /workdir
       run: |
         echo "::group::📦 存储空间信息"
         df -hT $PWD
