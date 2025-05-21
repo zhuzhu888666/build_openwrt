@@ -1,1 +1,3 @@
 # build_openwrt
+可以选择lede的源和immortalwrt的源进行云编译
+目前immortalwrt还没有istore和turboacc，这两个还是挺实用的
