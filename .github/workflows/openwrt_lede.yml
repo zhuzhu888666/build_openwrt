@@ -20,7 +20,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # 修正为有效运行器类型
+    runs-on:  ubuntu-22.04 
 
     steps:
     - name: Checkout
