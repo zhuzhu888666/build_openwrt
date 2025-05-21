@@ -74,7 +74,7 @@ jobs:
         git clone --depth 1 $URL -b $BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
 
-    - name: 加载自定义配置
+    - name: 加载自定义配置diy-part1.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part1.sh"
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
@@ -97,7 +97,7 @@ jobs:
         ./scripts/feeds install -a
         echo "::endgroup::"
 
-    - name: 加载自定义配置
+    - name: 加载自定义配置diy-part2.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part2.sh"
         [ -e files ] && mv files openwrt/files
