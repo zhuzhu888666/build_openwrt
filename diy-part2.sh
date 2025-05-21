@@ -34,4 +34,4 @@ sed -i 's/ImmortalWrt/N60Pro/g' package/base-files/files/bin/config_generate
 
 #加入rkp-ipid模块和turboacc
  git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
- curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
+ #curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
