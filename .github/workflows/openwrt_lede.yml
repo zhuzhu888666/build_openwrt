@@ -1,4 +1,4 @@
-name: 编译immortalwrt的源
+name: 编译lede的源
 
 on:
   repository_dispatch:
@@ -10,7 +10,7 @@ on:
         default: 'false'
 
 env:
-  URL: https://github.com/immortalwrt/immortalwrt
+  URL: https://github.com/coolsnowwolf/lede
   BRANCH: master
   FEEDS_CONF: feeds.conf.default
   CONFIG_FILE: .config
