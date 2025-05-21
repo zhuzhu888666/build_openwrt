@@ -73,9 +73,10 @@ jobs:
       run: |
         if [ -f "../$DIY_P1_SH" ]; then
           echo "::group::🚀 执行自定义脚本 Part1"
-          chmod +x ../$DIY_P1_SH
-          cp ../$FEEDS_CONF openwrt/feeds.conf.default
-          cd openwrt && ../$DIY_P1_SH
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
+        chmod +x $DIY_P1_SH
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
           echo "::endgroup::"
         fi
 
