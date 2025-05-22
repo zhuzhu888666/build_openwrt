@@ -22,14 +22,14 @@
 
 # Modify hostname
 #修改名称
-#sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
-
-sed -i 's/ImmortalWrt/N60Pro/g' package/base-files/files/bin/config_generate
+#sed -i 's/ImmortalWrt/N60Pro/g' package/base-files/files/bin/config_generate
+sed -i 's/LEDE/N60Pro/g' package/base-files/files/bin/config_generate
 
 #修改wifi名称（mtwifi-cfg）
 #sed -i 's/WHK_Telecom-2.4G/OpenWrt/g' package/mtk/applications/mtwifi-cfg/files/mtwifi.sh
 #sed -i 's/WHK_Telecom/OpenWrt5G/g' package/mtk/applications/mtwifi-cfg/files/mtwifi.sh
-
+#或者使用
+#sed -i 's/LEDE/OpenWrt-5G/g' package/kernel/mac80211/files/lib/wifi/mac80211.sh
 
 
 #加入rkp-ipid模块和turboacc
