@@ -211,12 +211,6 @@ jobs:
     - name: 删除工作流运行
       uses: Mattraks/delete-workflow-runs@main
       with:
-        retain_days: 0
-        keep_minimum_runs: 2        
-    # 特殊功能说明：
-    - name: 删除工作流运行
-      uses: Mattraks/delete-workflow-runs@main
-      with:
         retain_days: 0       # 立即删除历史运行记录
         keep_minimum_runs: 2 # 保留最近 2 次运行
 
