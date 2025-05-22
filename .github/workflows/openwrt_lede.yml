@@ -1,14 +1,18 @@
 name: 编译lede的源
 
+# 定义触发工作流的事件类型
 on:
+# 当其他仓库向本仓库发送 repository_dispatch 事件时触发
   repository_dispatch:
+   # 当手动点击"手动运行工作流"按钮时触发
   workflow_dispatch:
+   # 定义手动触发时的输入参数
     inputs:
       ssh:
-        description: 'SSH connection to Actions'
-        required: false
-        default: 'false'
-
+        description: 'SSH connection to Actions' # 该参数非必填
+        required: false  # 
+        default: 'false' # 参数默认值为 false
+        # 该参数用于控制是否建立 SSH 连接（如需要访问私有仓库等场景）
 env:
   URL: https://github.com/coolsnowwolf/lede
   BRANCH: master
