@@ -28,13 +28,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04  # 使用 Ubuntu 22.04 运行环境
-
     steps:
     # 第一步：检出仓库代码
     - name: Checkout
       uses: actions/checkout@v4  # 使用官方 checkout 动作
-
-    # 第二步：服务器资源检查
     - name: 检查服务器配置
       run: |
         # 使用日志分组显示服务器信息
@@ -55,8 +52,7 @@ jobs:
         echo "--------------------------硬盘信息--------------------------"
         df -Th
         echo "::endgroup::"
-
-    # 第三步：环境初始化
+        
     - name: 初始化构建环境
       run: |
         # 清理系统残留文件
@@ -84,8 +80,7 @@ jobs:
         # 创建工作目录
         sudo mkdir -p /workdir
         sudo chown -R $USER:$GROUPS /workdir
-
-    # 第四步：克隆源码
+        
     - name: 克隆源代码
       run: |
         echo "::group::📦 存储空间信息"
@@ -95,8 +90,7 @@ jobs:
         git clone --depth 1 $URL -b $BRANCH openwrt
         # 创建符号链接到工作空间
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
-
-    # 第五步：执行第一阶段自定义配置
+        
     - name: 加载自定义配置diy-part1.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part1.sh"
@@ -131,7 +125,6 @@ jobs:
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         echo "::endgroup::"
-
     - name: 下载依赖
       run: |
         cd openwrt
