@@ -210,15 +210,17 @@ jobs:
     - name: 删除工作流运行
       uses: Mattraks/delete-workflow-runs@main
       with:
-        retain_days: 0       # 立即删除历史运行记录
-        keep_minimum_runs: 2 # 保留最近 2 次运行
+        retain_days: 0
+        keep_minimum_runs: 2
 
     - name: 删除旧版本
       uses: dev-drprasad/delete-older-releases@master
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        keep_latest: 5      # 保留最近 5 个 Release
-        delete_tags: true   # 同步删除关联的 Tag
-
+        keep_latest: 5
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     # 失败处理机制
     # - name: 失败则通知
     #   if: ${{ failure() }}
