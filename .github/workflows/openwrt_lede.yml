@@ -95,7 +95,7 @@ jobs:
         sudo mkdir -p /workdir
         sudo chown -R $USER:$GROUPS /workdir  # $GROUPS获取用户所属组
         
-    # 第四步：获取LEDE源码
+    # 第四步：获取源码
     - name: 克隆源代码
       working-directory: /workdir  # 指定命令执行目录
       run: |
