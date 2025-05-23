@@ -33,9 +33,9 @@ sed -i 's/LEDE/N60Pro/g' package/base-files/files/bin/config_generate
 
 #修复immortalwrt下编译istore报错问题
 #删除LUCI_EXTRA_DEPENDS行，合并到LUCI_DEPENDS解决格式问题
-sed -i 's/LUCI_DEPENDS:=+luci-lib-xterm +taskd//g' package/feeds/istore/luci-lib-taskd/Makefile 
-sed -i 's/LUCI_EXTRA_DEPENDS:=taskd (>=1.0.3-1)/LUCI_DEPENDS:=+luci-lib-xterm +taskd @>=1.0.3-1/g' package/feeds/istore/luci-lib-taskd/Makefile 
+#sed -i 's/LUCI_DEPENDS:=+luci-lib-xterm +taskd//g' package/feeds/istore/luci-lib-taskd/Makefile 
+#sed -i 's/LUCI_EXTRA_DEPENDS:=taskd (>=1.0.3-1)/LUCI_DEPENDS:=+luci-lib-xterm +taskd @>=1.0.3-1/g' package/feeds/istore/luci-lib-taskd/Makefile 
 
 #加入rkp-ipid模块和turboacc
  git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
- curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
+ #curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
