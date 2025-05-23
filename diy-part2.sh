@@ -39,6 +39,3 @@ sed -i 's/LEDE/N60Pro/g' package/base-files/files/bin/config_generate
 #加入rkp-ipid模块和turboacc
  git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
  #curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
-
- git clone https://github.com/destan19/OpenAppFilter.git package/OpenAppFilter
- git clone https://github.com/xiaoqingfengATGH/luci-theme-infinityfreedom package/luci-theme-infinityfreedom
