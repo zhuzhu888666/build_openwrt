@@ -139,7 +139,6 @@ jobs:
 
     - name: 编译固件
       run: |
-        cd openwrt
         echo "::group::🏗️ 编译日志 (详细模式)"
         cd openwrt
         echo -e "$(nproc) thread compile"
