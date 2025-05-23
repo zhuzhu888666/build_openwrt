@@ -1,77 +1,82 @@
-# 工作流名称
+# 工作流名称：用于在 GitHub Actions 界面显示
 name: 编译lede的源
 
 # 定义触发条件
 on:
-  # 允许通过 repository_dispatch 事件外部触发
+  # 允许通过 repository_dispatch 事件外部触发（例如通过API调用）
   repository_dispatch:
-  # 允许手动触发工作流
+  # 允许在 GitHub 网页手动触发工作流
   workflow_dispatch:
     # 定义手动触发时的输入参数
     inputs:
       ssh:
-        description: 'SSH connection to Actions'  # 参数描述
+        description: 'SSH connection to Actions'  # 参数描述：用于建立SSH连接
         required: false                          # 非必填参数
-        default: 'false'                         # 默认值
-        # 该参数用于控制是否建立 SSH 连接（用于调试或访问私有仓库）
+        default: 'false'                         # 默认值设为'false'
+        # 用途：调试或访问私有仓库时开启SSH隧道
 
-# 全局环境变量
+# 全局环境变量配置
 env:
-  URL: https://github.com/coolsnowwolf/lede     # 源码仓库地址
+  URL: https://github.com/coolsnowwolf/lede     # LEDE源码仓库地址
   BRANCH: master                                # 使用的代码分支
-  FEEDS_CONF: feeds.conf.default                # feeds 配置文件
-  CONFIG_FILE: lede_n60pro.config               # 设备配置文件
-  DIY_P1_SH: diy-part1.sh                       # 第一阶段自定义脚本
-  DIY_P2_SH: diy-part2.sh                       # 第二阶段自定义脚本
+  FEEDS_CONF: feeds.conf.default                # 软件源配置文件路径
+  CONFIG_FILE: lede_n60pro.config               # 设备特定配置文件
+  DIY_P1_SH: diy-part1.sh                       # 编译前自定义脚本（第一阶段）
+  DIY_P2_SH: diy-part2.sh                       # 编译前自定义脚本（第二阶段）
   
-  UPLOAD_BIN_DIR: false
-  UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
+  # 上传控制开关
+  UPLOAD_BIN_DIR: false                        # 是否上传整个bin目录
+  UPLOAD_FIRMWARE: true                        # 是否上传编译好的固件
+  UPLOAD_RELEASE: true                         # 是否创建版本发布
   
-  TZ: Asia/Shanghai                             # 时区设置
+  TZ: Asia/Shanghai                             # 设置时区为上海时间
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # 使用 Ubuntu 22.04 运行环境
+    runs-on: ubuntu-22.04  # 使用 GitHub 托管的 Ubuntu 22.04 运行环境
+    
     steps:
-    # 第一步：检出仓库代码
+    # 第一步：检出当前仓库代码到工作目录
     - name: Checkout
-      uses: actions/checkout@v4  # 使用官方 checkout 动作
+      uses: actions/checkout@v4  # 使用官方 checkout 动作版本4
+
+    # 第二步：服务器硬件资源检查
     - name: 检查服务器配置
       run: |
-        # 使用日志分组显示服务器信息
+        # 使用日志分组功能折叠详细信息
         echo "::group::🖥️ 服务器资源详情"
-        echo "⚠️ 重要提示"
-        echo "若服务器性能不足请立即取消运行！已知兼容型号：Ryzen 8370C/8171M"
-        # 输出 CPU 信息
+        echo "⚠️ 重要提示：性能不足请取消运行！"
+        # 输出CPU信息
         echo "--------------------------CPU信息--------------------------"
-        echo "CPU物理数量:$(cat /proc/cpuinfo| grep "physical id"| sort| uniq| wc -l)"
-        echo "CPU型号: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"
-        echo "CPU核心数: $(nproc)"
+        echo "物理CPU数量:$(grep "physical id" /proc/cpuinfo | sort | uniq | wc -l)"
+        echo "CPU型号: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"  # xargs去除空白
+        echo "逻辑核心数: $(nproc)"
         # 输出内存信息
         echo "--------------------------内存信息--------------------------"
-        echo "内存总量: $(free -h | awk '/Mem/{print $2}')"
-        sudo lshw -short -C memory | grep GiB
-        echo -e "\n"
+        echo "总内存: $(free -h | awk '/Mem/{print $2}')"
+        sudo lshw -short -C memory | grep GiB  # 显示详细内存配置
         # 输出磁盘信息
         echo "--------------------------硬盘信息--------------------------"
-        df -Th
+        df -Th  # 显示磁盘使用情况（包含文件系统类型）
         echo "::endgroup::"
         
+    # 第三步：准备编译环境
     - name: 初始化构建环境
       env:
-        DEBIAN_FRONTEND: noninteractive    
+        DEBIAN_FRONTEND: noninteractive  # 禁用交互式安装提示
       run: |
-        # 清理系统残留文件
+        # 清理可能存在的残留文件
         sudo rm -rf /etc/apt/sources.list.d/* \
           /usr/share/dotnet \
           /usr/local/lib/android \
           /opt/ghc \
           /opt/hostedtoolcache/CodeQL
-        # 清理 Docker 资源
+        
+        # 清理Docker缓存释放空间
         sudo docker system prune -a -f
-        # 安装编译依赖包
-        sudo apt-get -qq update
+        
+        # 更新软件源并安装编译依赖
+        sudo apt-get -qq update  # -qq静默模式
         sudo apt-get -qq install -y \
           ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
           bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext \
@@ -82,141 +87,172 @@ jobs:
           pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils \
           rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
           vim wget xmlto xxd zlib1g-dev
-        # 设置时区
-        sudo timedatectl set-timezone "$TZ"
-        # 创建工作目录
-        sudo mkdir -p /workdir
-        sudo chown -R $USER:$GROUPS /workdir
         
+        # 配置系统时区
+        sudo timedatectl set-timezone "$TZ"
+        
+        # 创建持久化工作目录并授权
+        sudo mkdir -p /workdir
+        sudo chown -R $USER:$GROUPS /workdir  # $GROUPS获取用户所属组
+        
+    # 第四步：获取LEDE源码
     - name: 克隆源代码
-      working-directory: /workdir
+      working-directory: /workdir  # 指定命令执行目录
       run: |
         echo "::group::📦 存储空间信息"
-        df -hT $PWD  # 显示当前目录磁盘使用情况
+        df -hT $PWD  # 显示当前路径磁盘使用情况
         echo "::endgroup::"
-        # 克隆指定分支的源码（深度克隆节省时间）
+        
+        # 克隆源码（depth=1仅克隆最新提交，节省时间）
         git clone --depth 1 $URL -b $BRANCH openwrt
-        # 创建符号链接到工作空间
+        
+        # 创建符号链接到GitHub工作空间
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
         
+    # 第五步：应用第一阶段自定义配置
     - name: 加载自定义配置diy-part1.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part1.sh"
-        # 应用 feeds 配置文件
+        # 如果存在feeds配置文件则替换默认配置
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
-        # 执行自定义脚本
+        
+        # 添加执行权限并运行自定义脚本
         chmod +x $DIY_P1_SH
         cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P1_SH
+        $GITHUB_WORKSPACE/$DIY_P1_SH  # 从仓库根目录执行脚本
         echo "::endgroup::"
 
+    # 第六步：更新软件源
     - name: 更新 feeds
       run: |
         cd openwrt
         echo "::group::🔄 更新软件源"
-        ./scripts/feeds update -a
+        ./scripts/feeds update -a  # -a表示更新所有feeds
         echo "::endgroup::"
 
+    # 第七步：安装软件包
     - name: 安装 feeds
       run: |
         cd openwrt
         echo "::group::📥 安装软件包"
-        ./scripts/feeds install -a
+        ./scripts/feeds install -a  # 安装所有feeds中的包
         echo "::endgroup::"
 
+    # 第八步：应用第二阶段自定义配置
     - name: 加载自定义配置diy-part2.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part2.sh"
+        # 如果存在files目录则移动到openwrt中（用于自定义文件）
         [ -e files ] && mv files openwrt/files
+        
+        # 应用设备配置文件
         [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
+        
+        # 执行第二阶段自定义脚本
         chmod +x $DIY_P2_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         echo "::endgroup::"
+        
+    # 第九步：下载依赖包
     - name: 下载依赖
-      id: package
+      id: package  # 步骤标识符，用于后续引用
       run: |
         cd openwrt
-        make defconfig
+        make defconfig  # 生成默认配置
+        
         echo "::group::📦 下载软件包"
+        # 多线程下载（核心数+1），失败后重试单线程下载
         make download -j$(($(nproc) + 1)) || make download -j1 V=s
         echo "::endgroup::"
+        
         echo "::group::🔍 检查无效文件"
-        find dl -size -1024c -exec ls -l {} \;
+        # 查找小于1KB的无效文件并删除
+        find dl -size -1024c -exec ls -l {} \;  # 显示文件详情
         find dl -size -1024c -exec rm -f {} \;
         echo "::endgroup::"
 
+    # 第十步：开始编译固件
     - name: 编译固件
-      id: compile
+      id: compile  # 步骤标识符
       run: |
         echo "::group::🏗️ 编译日志 (详细模式)"
         cd openwrt
-        echo "::group::🏗️ 编译日志 (详细模式)"
+        # 多线程编译，失败后使用单线程详细模式
         make -j$(($(nproc) + 1)) || make -j1 V=s
         echo "::endgroup::"
+
+    # 第十一步：收集存储空间信息
     - name: 收集编译结果
-      #if: ${{ always() }}
-      if: (!cancelled())
+      if: (!cancelled())  # 仅在未取消时执行
       run: |
         echo "::group::📊 最终存储空间使用"
-        df -hT
+        df -hT  # 显示完整磁盘使用情况
         echo "::endgroup::"
         
+    # 第十二步：上传bin目录（按需开启）
     - name: 上传bin目录
       uses: actions/upload-artifact@main
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
       with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: openwrt/bin
+        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}  # 动态生成名称
+        path: openwrt/bin  # 上传整个bin目录
 
+    # 第十三步：整理固件文件
     - name: 整理输出文件
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd openwrt/bin/targets/*/*
-        rm -rf packages
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
+        cd openwrt/bin/targets/*/*  # 进入固件目录
+        rm -rf packages  # 删除软件包目录（节省空间）
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV  # 设置环境变量供后续步骤使用
+        echo "status=success" >> $GITHUB_OUTPUT  # 输出状态
 
+    # 第十四步：上传固件文件
     - name: 上传输出文件
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
+        path: ${{ env.FIRMWARE }}  # 使用前一步设置的环境变量
 
+    # 第十五步：生成发布日期标签
     - name: 生成发布标签
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
+        # 生成格式为 年.月.日-时分 的标签
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        # 创建发布说明文件
         touch release.txt
+        # 如果启用GoFile上传，添加链接（示例条件判断）
         [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
+    # 第十六步：发布到GitHub Release
     - name: 发布固件至 Release
       uses: softprops/action-gh-release@master
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用自动生成的令牌
       with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
+        tag_name: ${{ steps.tag.outputs.release_tag }}  # 动态标签名
+        body_path: release.txt  # 发布说明文件
+        files: ${{ env.FIRMWARE }}/*  # 上传所有固件文件
 
+    # 第十七步：清理旧工作流运行
     - name: 删除工作流运行
       uses: Mattraks/delete-workflow-runs@main
       with:
-        retain_days: 0
-        keep_minimum_runs: 2
+        retain_days: 0  # 保留0天前的记录
+        keep_minimum_runs: 2  # 至少保留2次运行记录
 
+    # 第十八步：清理旧版本发布
     - name: 删除旧版本
       uses: dev-drprasad/delete-older-releases@master
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        keep_latest: 5
-        delete_tags: true
+        keep_latest: 5  # 保留最新5个发布
+        delete_tags: true  # 同时删除关联的标签
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    # 失败处理机制
-    # - name: 失败则通知
