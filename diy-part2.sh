@@ -38,4 +38,4 @@ sed -i 's/LUCI_EXTRA_DEPENDS:=taskd (>=1.0.3-1)/LUCI_DEPENDS:=+luci-lib-xterm +t
 
 #加入rkp-ipid模块和turboacc
  git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
- #curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
+ curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
