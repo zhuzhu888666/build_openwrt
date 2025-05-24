@@ -34,7 +34,10 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04  # 使用 GitHub 托管的 Ubuntu 22.04 运行环境
-    
+      # 添加权限配置
+    permissions:
+      contents: write  # 授予写入权限（包括Release）
+      
     steps:
     # 第一步：检出当前仓库代码到工作目录
     - name: Checkout
