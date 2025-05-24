@@ -1,4 +1,4 @@
-name: 编译lede的源
+name: 编译lede的源_test
 
 # 定义触发工作流的事件类型
 on:
