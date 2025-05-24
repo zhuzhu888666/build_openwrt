@@ -25,7 +25,9 @@ env:
 jobs:
   build:
     runs-on: ubuntu-22.04
-
+    # 添加权限配置
+    permissions:
+      contents: write  # 授予写入权限（包括Release）
     steps:
     - name: Checkout
       uses: actions/checkout@main
@@ -145,7 +147,7 @@ jobs:
         echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
         touch release.txt
         [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
+        echo "status=success" >> $GITHUB_OUTPUT 
 
     - name: 发布固件至 Release
       uses: softprops/action-gh-release@master
