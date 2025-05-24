@@ -54,6 +54,7 @@ jobs:
           /usr/local/lib/android \
           /opt/ghc \
           /opt/hostedtoolcache/CodeQL
+        sudo rm -rf /tmp/*
         sudo docker system prune -a -f
         sudo apt-get -qq update
         sudo apt-get -qq install -y \
