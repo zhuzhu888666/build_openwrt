@@ -193,13 +193,13 @@ jobs:
         df -hT  # 显示完整磁盘使用情况
         echo "::endgroup::"
         
-    # 第十二步：上传bin目录（按需开启）
-    - name: 上传bin目录
-      uses: actions/upload-artifact@main
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
-      with:
-        name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}  # 动态生成名称
-        path: openwrt/bin  # 上传整个bin目录
+    # # 第十二步：上传bin目录（按需开启）
+    # - name: 上传bin目录
+    #   uses: actions/upload-artifact@main
+    #   if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+    #   with:
+    #     name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}  # 动态生成名称
+    #     path: openwrt/bin  # 上传整个bin目录
 
     # 第十三步：整理固件文件
     - name: 整理输出文件
@@ -215,6 +215,8 @@ jobs:
     - name: 上传输出文件
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}  # 使用前一步设置的环境变量
@@ -246,6 +248,8 @@ jobs:
     # 第十七步：清理旧工作流运行
     - name: 删除工作流运行
       uses: Mattraks/delete-workflow-runs@main
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         retain_days: 0  # 保留0天前的记录
         keep_minimum_runs: 2  # 至少保留2次运行记录
