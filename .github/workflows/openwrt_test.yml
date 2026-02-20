@@ -20,7 +20,7 @@ env:
   URL: https://github.com/immortalwrt/immortalwrt     #源码仓库地址
   BRANCH: v24.10.5                                # 使用的代码分支
   FEEDS_CONF: imm_feeds.conf.default                # 软件源配置文件路径
-  CONFIG_FILE: lede_n60pro.config               # 设备特定配置文件
+  CONFIG_FILE: imm_n60pro.config               # 设备特定配置文件
   DIY_P1_SH: diy-part1.sh                       # 编译前自定义脚本（第一阶段）
   DIY_P2_SH: diy-part2.sh                       # 编译前自定义脚本（第二阶段）
   
