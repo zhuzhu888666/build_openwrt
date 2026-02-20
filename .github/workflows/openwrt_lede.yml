@@ -75,7 +75,22 @@ jobs:
           /usr/local/lib/android \
           /opt/ghc \
           /opt/hostedtoolcache/CodeQL
-        
+          # 移除 LEDE 编译不需要的大型预装软件
+          # 注意：LEDE 编译主要依赖 gcc、make 等基础工具，这些会保留
+        sudo rm -rf /usr/share/dotnet          # .NET SDK 套件
+        sudo rm -rf /usr/local/lib/android     # Android SDK (通常非常庞大，>10GB)
+        sudo rm -rf /opt/ghc                    # Glasgow Haskell Compiler
+        sudo rm -rf /usr/local/.ghcup           # Haskell 工具链
+        sudo rm -rf /usr/share/swift            # Swift 编译器
+        sudo rm -rf /usr/lib/jvm                 # 多个版本的 Java JDK
+        sudo rm -rf /opt/hostedtoolcache        # GitHub 托管的工具缓存 (CodeQL, Python, Go等)
+        sudo rm -rf /usr/local/share/powershell # PowerShell
+        sudo rm -rf /usr/share/miniconda        # Miniconda
+        sudo rm -rf /usr/local/share/chromium   # Chromium 浏览器
+        sudo rm -rf /opt/google/chrome           # Chrome 浏览器
+        sudo rm -rf /opt/microsoft/msedge        # Edge 浏览器
+        echo "=== Disk usage after cleanup ==="
+        df -h /
         # 清理Docker缓存释放空间
         sudo docker system prune -a -f
         
