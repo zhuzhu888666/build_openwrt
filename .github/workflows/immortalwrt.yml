@@ -17,9 +17,9 @@ on:
 
 # 全局环境变量配置
 env:
-  URL: https://github.com/immortalwrt/immortalwrt     # 源码仓库地址
-  BRANCH:  v24.10.5                                # 使用的代码分支
-  FEEDS_CONF: feeds.conf.default                # 软件源配置文件路径
+  URL: https://github.com/immortalwrt/immortalwrt     #源码仓库地址
+  BRANCH: v24.10.5                                # 使用的代码分支
+  FEEDS_CONF: imm_feeds.conf.default                # 软件源配置文件路径
   CONFIG_FILE: imm_n60pro.config               # 设备特定配置文件
   DIY_P1_SH: diy-part1.sh                       # 编译前自定义脚本（第一阶段）
   DIY_P2_SH: diy-part2.sh                       # 编译前自定义脚本（第二阶段）
@@ -96,16 +96,15 @@ jobs:
         
         # 更新软件源并安装编译依赖
         sudo apt-get -qq update  # -qq静默模式
-        sudo apt-get -qq install -y \
-          ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext \
-          gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 \
-          libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev \
-          libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev \
-          libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch \
-          pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils \
-          rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
-          vim wget xmlto xxd zlib1g-dev
+        sudo apt install -y \
+        ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
+          g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
+          libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
+          libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
+          ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
+          python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
+          upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstd
         
         # 配置系统时区
         sudo timedatectl set-timezone "$TZ"
@@ -123,28 +122,28 @@ jobs:
         echo "::endgroup::"
         
         # 克隆源码（depth=1仅克隆最新提交，节省时间）
-        git clone -b $BRANCH --single-branch --filter=blob:none $URL
+        git clone --depth 1 $URL -b $BRANCH openwrt
         
         # 创建符号链接到GitHub工作空间
-        ln -sf /workdir/immortalwrt $GITHUB_WORKSPACE/immortalwrt
+        ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
         
     # 第五步：应用第一阶段自定义配置
     - name: 加载自定义配置diy-part1.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part1.sh"
         # 如果存在feeds配置文件则替换默认配置
-        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF immortalwrt/feeds.conf.default
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         
         # 添加执行权限并运行自定义脚本
         chmod +x $DIY_P1_SH
-        cd immortalwrt
+        cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH  # 从仓库根目录执行脚本
         echo "::endgroup::"
 
     # 第六步：更新软件源
     - name: 更新 feeds
       run: |
-        cd immortalwrt
+        cd openwrt
         echo "::group::🔄 更新软件源"
         ./scripts/feeds update -a  # -a表示更新所有feeds
         echo "::endgroup::"
@@ -152,7 +151,7 @@ jobs:
     # 第七步：安装软件包
     - name: 安装 feeds
       run: |
-        cd immortalwrt
+        cd openwrt
         echo "::group::📥 安装软件包"
         ./scripts/feeds install -a  # 安装所有feeds中的包
         echo "::endgroup::"
@@ -161,15 +160,15 @@ jobs:
     - name: 加载自定义配置diy-part2.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part2.sh"
-        # 如果存在files目录则移动到immortalwrt中（用于自定义文件）
-        [ -e files ] && mv files immortalwrt/files
+        # 如果存在files目录则移动到openwrt中（用于自定义文件）
+        [ -e files ] && mv files openwrt/files
         
         # 应用设备配置文件
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE immortalwrt/.config
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE openwrt/.config
         
         # 执行第二阶段自定义脚本
         chmod +x $DIY_P2_SH
-        cd immortalwrt
+        cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
         echo "::endgroup::"
         
@@ -177,7 +176,7 @@ jobs:
     - name: 下载依赖
       id: package  # 步骤标识符，用于后续引用
       run: |
-        cd immortalwrt
+        cd openwrt
         make defconfig  # 生成默认配置
         
         echo "::group::📦 下载软件包"
@@ -196,7 +195,7 @@ jobs:
       id: compile  # 步骤标识符
       run: |
         echo "::group::🏗️ 编译日志 (详细模式)"
-        cd immortalwrt
+        cd openwrt
         # 多线程编译，失败后使用单线程详细模式
         make -j$(($(nproc) + 1)) || make -j1 V=s
         echo "::endgroup::"
@@ -214,15 +213,15 @@ jobs:
     #   uses: actions/upload-artifact@main
     #   if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
     #   with:
-    #     name: immortalwrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}  # 动态生成名称
-    #     path: immortalwrt/bin  # 上传整个bin目录
+    #     name: OpenWrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}  # 动态生成名称
+    #     path: openwrt/bin  # 上传整个bin目录
 
     # 第十三步：整理固件文件
     - name: 整理输出文件
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        cd immortalwrt/bin/targets/*/*  # 进入固件目录
+        cd openwrt/bin/targets/*/*  # 进入固件目录
         rm -rf packages  # 删除软件包目录（节省空间）
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV  # 设置环境变量供后续步骤使用
         echo "status=success" >> $GITHUB_OUTPUT  # 输出状态
@@ -234,7 +233,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        name: immortalwrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
         path: ${{ env.FIRMWARE }}  # 使用前一步设置的环境变量
 
     # 第十五步：生成发布日期标签
@@ -267,8 +266,7 @@ jobs:
       with:
         retain_days: 0  # 保留0天前的记录
         keep_minimum_runs: 2  # 至少保留2次运行记录
-        # 新增排除当前运行参数
-        exclude_current_runs: true  # 防止误删正在运行的工作流
+        # 注意：exclude_current_runs参数已被移除，因为该Action不支持
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}       
 
