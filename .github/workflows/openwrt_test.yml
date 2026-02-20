@@ -1,338 +1,283 @@
-# 工作流名称：在GitHub Actions 界面显示
+# 工作流名称：用于在 GitHub Actions 界面显示
 name: 编译immortalwrt的源
 
 # 定义触发条件
 on:
+  # 允许通过 repository_dispatch 事件外部触发（例如通过API调用）
   repository_dispatch:
+  # 允许在 GitHub 网页手动触发工作流
   workflow_dispatch:
+    # 定义手动触发时的输入参数
     inputs:
       ssh:
-        description: 'SSH connection to Actions'
-        required: false
-        default: 'false'
+        description: 'SSH connection to Actions'  # 参数描述：用于建立SSH连接
+        required: false                          # 非必填参数
+        default: 'false'                         # 默认值设为'false'
+        # 用途：调试或访问私有仓库时开启SSH隧道
 
 # 全局环境变量配置
 env:
-  URL: https://github.com/immortalwrt/immortalwrt
-  BRANCH: v24.10.5
-  FEEDS_CONF: imm_feeds.conf.default
-  CONFIG_FILE: imm_n60pro.config
-  DIY_P1_SH: diy-part1.sh
-  DIY_P2_SH: diy-part2.sh
+  URL: https://github.com/immortalwrt/immortalwrt     # 源码仓库地址
+  BRANCH:  v24.10.5                                # 使用的代码分支
+  FEEDS_CONF: imm_feeds.conf.default                # 软件源配置文件路径
+  CONFIG_FILE: imm_n60pro.config               # 设备特定配置文件
+  DIY_P1_SH: diy-part1.sh                       # 编译前自定义脚本（第一阶段）
+  DIY_P2_SH: diy-part2.sh                       # 编译前自定义脚本（第二阶段）
   
   # 上传控制开关
-  UPLOAD_BIN_DIR: false
-  UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
-  UPLOAD_GOFILE: false  # 添加定义
+  UPLOAD_BIN_DIR: false                        # 是否上传整个bin目录
+  UPLOAD_FIRMWARE: true                        # 是否上传编译好的固件
+  UPLOAD_RELEASE: true                         # 是否创建版本发布
   
-  # 设备信息
-  DEVICE_NAME: n60pro  # 添加定义
-  TZ: Asia/Shanghai
+  TZ: Asia/Shanghai                             # 设置时区为上海时间
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-22.04  # 使用 GitHub 托管的 Ubuntu 22.04 运行环境
+      # 添加权限配置
     permissions:
-      contents: write  # 用于创建/删除release、推送标签
-      actions: write   # 用于删除工作流运行记录
+      contents: write  # 授予写入权限（包括Release）
+      actions: write  # 新增此行权限，解决没有权限删除工作流的
       
     steps:
     # 第一步：检出当前仓库代码到工作目录
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v4  # 使用官方 checkout 动作版本4
 
     # 第二步：服务器硬件资源检查
     - name: 检查服务器配置
       run: |
+        # 使用日志分组功能折叠详细信息
         echo "::group::🖥️ 服务器资源详情"
         echo "⚠️ 重要提示：性能不足请取消运行！"
+        # 输出CPU信息
         echo "--------------------------CPU信息--------------------------"
         echo "物理CPU数量:$(grep "physical id" /proc/cpuinfo | sort | uniq | wc -l)"
-        echo "CPU型号: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"
+        echo "CPU型号: $(lscpu | grep 'Model name' | cut -d: -f2 | xargs)"  # xargs去除空白
         echo "逻辑核心数: $(nproc)"
+        # 输出内存信息
         echo "--------------------------内存信息--------------------------"
         echo "总内存: $(free -h | awk '/Mem/{print $2}')"
-        sudo lshw -short -C memory | grep GiB || true
+        sudo lshw -short -C memory | grep GiB  # 显示详细内存配置
+        # 输出磁盘信息
         echo "--------------------------硬盘信息--------------------------"
-        df -Th
+        df -Th  # 显示磁盘使用情况（包含文件系统类型）
         echo "::endgroup::"
         
     # 第三步：准备编译环境
     - name: 初始化构建环境
       env:
-        DEBIAN_FRONTEND: noninteractive
+        DEBIAN_FRONTEND: noninteractive  # 禁用交互式安装提示
       run: |
-        # 定义需要清理的目录列表，避免重复
-        CLEAN_DIRS=(
-          "/etc/apt/sources.list.d/*"
-          "/usr/share/dotnet"
-          "/usr/local/lib/android"
-          "/opt/ghc"
-          "/opt/hostedtoolcache/CodeQL"
-          "/usr/local/.ghcup"
-          "/usr/share/swift"
-          "/usr/lib/jvm"
-          "/opt/hostedtoolcache"
-          "/usr/local/share/powershell"
-          "/usr/share/miniconda"
-          "/usr/local/share/chromium"
-          "/opt/google/chrome"
-          "/opt/microsoft/msedge"
-        )
-        
-        # 清理系统冗余文件
-        for dir in "${CLEAN_DIRS[@]}"; do
-          sudo rm -rf "$dir" 2>/dev/null || true
-        done
-        
+        # 清理可能存在的残留文件
+        sudo rm -rf /etc/apt/sources.list.d/* \
+          /usr/share/dotnet \
+          /usr/local/lib/android \
+          /opt/ghc \
+          /opt/hostedtoolcache/CodeQL
+          # 移除 LEDE 编译不需要的大型预装软件
+          # 注意：LEDE 编译主要依赖 gcc、make 等基础工具，这些会保留
+        sudo rm -rf /usr/share/dotnet          # .NET SDK 套件
+        sudo rm -rf /usr/local/lib/android     # Android SDK (通常非常庞大，>10GB)
+        sudo rm -rf /opt/ghc                    # Glasgow Haskell Compiler
+        sudo rm -rf /usr/local/.ghcup           # Haskell 工具链
+        sudo rm -rf /usr/share/swift            # Swift 编译器
+        sudo rm -rf /usr/lib/jvm                 # 多个版本的 Java JDK
+        sudo rm -rf /opt/hostedtoolcache        # GitHub 托管的工具缓存 (CodeQL, Python, Go等)
+        sudo rm -rf /usr/local/share/powershell # PowerShell
+        sudo rm -rf /usr/share/miniconda        # Miniconda
+        sudo rm -rf /usr/local/share/chromium   # Chromium 浏览器
+        sudo rm -rf /opt/google/chrome           # Chrome 浏览器
+        sudo rm -rf /opt/microsoft/msedge        # Edge 浏览器
         echo "=== Disk usage after cleanup ==="
         df -h /
-        
         # 清理Docker缓存释放空间
-        sudo docker system prune -a -f 2>/dev/null || true
+        sudo docker system prune -a -f
         
         # 更新软件源并安装编译依赖
-        sudo apt update -y
-        sudo apt full-upgrade -y
-        sudo apt install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
-          bzip2 ccache clang cmake cpio curl device-tree-compiler ecj fastjar flex gawk gettext gcc-multilib \
-          g++-multilib git gnutls-dev gperf haveged help2man intltool lib32gcc-s1 libc6-dev-i386 libelf-dev \
-          libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses-dev libpython3-dev \
-          libreadline-dev libssl-dev libtool libyaml-dev libz-dev lld llvm lrzsz mkisofs msmtp nano \
-          ninja-build p7zip p7zip-full patch pkgconf python3 python3-pip python3-ply python3-docutils \
-          python3-pyelftools qemu-utils re2c rsync scons squashfs-tools subversion swig texinfo uglifyjs \
-          upx-ucl unzip vim wget xmlto xxd zlib1g-dev zstdrsion swig texinfo uglifyjs upx-ucl unzip \
-                  vim wget xmlto xxd zlib1g-dev
+        sudo apt-get -qq update  # -qq静默模式
+        sudo apt-get -qq install -y \
+          ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
+          bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext \
+          gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 \
+          libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev \
+          libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev \
+          libssl-dev libtool lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch \
+          pkgconf python2.7 python3 python3-pyelftools python3-setuptools qemu-utils \
+          rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip \
+          vim wget xmlto xxd zlib1g-dev
         
         # 配置系统时区
         sudo timedatectl set-timezone "$TZ"
         
         # 创建持久化工作目录并授权
         sudo mkdir -p /workdir
-        sudo chown -R $USER:$GROUPS /workdir
+        sudo chown -R $USER:$GROUPS /workdir  # $GROUPS获取用户所属组
         
     # 第四步：获取源码
     - name: 克隆源代码
-      working-directory: /workdir
+      working-directory: /workdir  # 指定命令执行目录
       run: |
-        # 检查关键环境变量是否为空
-        if [ -z "$BRANCH" ] || [ -z "$URL" ]; then
-          echo "❌ 错误：BRANCH或URL环境变量为空"
-          exit 1
-        fi
-        
         echo "::group::📦 存储空间信息"
-        df -hT $PWD
+        df -hT $PWD  # 显示当前路径磁盘使用情况
         echo "::endgroup::"
         
-        # 克隆源码，确保目录存在
-        git clone -b $BRANCH --single-branch --filter=blob:none $URL immortalwrt || {
-          echo "❌ 源码克隆失败"
-          exit 1
-        }
+        # 克隆源码（depth=1仅克隆最新提交，节省时间）
+        git clone -b $BRANCH --single-branch --filter=blob:none $URL
         
-        # 确保目标目录存在后创建软链接
-        mkdir -p $GITHUB_WORKSPACE/immortalwrt
-        ln -sf /workdir/immortalwrt/* $GITHUB_WORKSPACE/immortalwrt/
+        # 创建符号链接到GitHub工作空间
+        ln -sf /workdir/immortalwrt $GITHUB_WORKSPACE/immortalwrt
         
     # 第五步：应用第一阶段自定义配置
     - name: 加载自定义配置diy-part1.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part1.sh"
-        cd $GITHUB_WORKSPACE/immortalwrt
+        # 如果存在feeds配置文件则替换默认配置
+        [ -e $FEEDS_CONF ] && mv $FEEDS_CONF immortalwrt/feeds.conf.default
         
-        # 移动feeds配置文件（如果存在）
-        [ -e $GITHUB_WORKSPACE/$FEEDS_CONF ] && mv $GITHUB_WORKSPACE/$FEEDS_CONF ./feeds.conf.default
-        
-        # 执行自定义脚本（如果存在）
-        if [ -e $GITHUB_WORKSPACE/$DIY_P1_SH ]; then
-          chmod +x $GITHUB_WORKSPACE/$DIY_P1_SH
-          $GITHUB_WORKSPACE/$DIY_P1_SH || {
-            echo "⚠️ diy-part1.sh执行出错，但继续流程"
-          }
-        else
-          echo "ℹ️ 未找到diy-part1.sh脚本，跳过执行"
-        fi
+        # 添加执行权限并运行自定义脚本
+        chmod +x $DIY_P1_SH
+        cd immortalwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH  # 从仓库根目录执行脚本
         echo "::endgroup::"
 
     # 第六步：更新软件源
     - name: 更新 feeds
       run: |
-        cd $GITHUB_WORKSPACE/immortalwrt
+        cd immortalwrt
         echo "::group::🔄 更新软件源"
-        ./scripts/feeds update -a || {
-          echo "❌ Feeds更新失败，重试一次"
-          ./scripts/feeds update -a || exit 1
-        }
+        ./scripts/feeds update -a  # -a表示更新所有feeds
         echo "::endgroup::"
 
     # 第七步：安装软件包
     - name: 安装 feeds
       run: |
-        cd $GITHUB_WORKSPACE/immortalwrt
+        cd immortalwrt
         echo "::group::📥 安装软件包"
-        ./scripts/feeds install -a || {
-          echo "❌ Feeds安装失败，重试一次"
-          ./scripts/feeds install -a || exit 1
-        }
+        ./scripts/feeds install -a  # 安装所有feeds中的包
         echo "::endgroup::"
 
     # 第八步：应用第二阶段自定义配置
     - name: 加载自定义配置diy-part2.sh
       run: |
         echo "::group::🚀 执行自定义脚本diy-part2.sh"
-        cd $GITHUB_WORKSPACE/immortalwrt
+        # 如果存在files目录则移动到immortalwrt中（用于自定义文件）
+        [ -e files ] && mv files immortalwrt/files
         
-        # 移动files目录（如果存在）
-        [ -d $GITHUB_WORKSPACE/files ] && mv $GITHUB_WORKSPACE/files ./
+        # 应用设备配置文件
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE immortalwrt/.config
         
-        # 移动配置文件（如果存在）
-        [ -e $GITHUB_WORKSPACE/$CONFIG_FILE ] && mv $GITHUB_WORKSPACE/$CONFIG_FILE ./.config
-        
-        # 执行自定义脚本（如果存在）
-        if [ -e $GITHUB_WORKSPACE/$DIY_P2_SH ]; then
-          chmod +x $GITHUB_WORKSPACE/$DIY_P2_SH
-          $GITHUB_WORKSPACE/$DIY_P2_SH || {
-            echo "⚠️ diy-part2.sh执行出错，但继续流程"
-          }
-        else
-          echo "ℹ️ 未找到diy-part2.sh脚本，跳过执行"
-        fi
+        # 执行第二阶段自定义脚本
+        chmod +x $DIY_P2_SH
+        cd immortalwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
         echo "::endgroup::"
         
     # 第九步：下载依赖包
     - name: 下载依赖
-      id: package
+      id: package  # 步骤标识符，用于后续引用
       run: |
-        cd $GITHUB_WORKSPACE/immortalwrt
-        make defconfig
+        cd immortalwrt
+        make defconfig  # 生成默认配置
         
         echo "::group::📦 下载软件包"
-        # 尝试多线程下载，失败则单线程详细输出
-        make download -j$(($(nproc) + 1)) || {
-          echo "⚠️ 多线程下载失败，单线程重试"
-          make download -j1 V=s || exit 1
-        }
+        # 多线程下载（核心数+1），失败后重试单线程下载
+        make download -j$(($(nproc) + 1)) || make download -j1 V=s
         echo "::endgroup::"
         
         echo "::group::🔍 检查无效文件"
-        # 删除小于1KB的无效文件
-        find dl -size -1024c -exec ls -l {} \; 2>/dev/null
-        find dl -size -1024c -exec rm -f {} \; 2>/dev/null
+        # 查找小于1KB的无效文件并删除
+        find dl -size -1024c -exec ls -l {} \;  # 显示文件详情
+        find dl -size -1024c -exec rm -f {} \;
         echo "::endgroup::"
 
     # 第十步：开始编译固件
     - name: 编译固件
-      id: compile
+      id: compile  # 步骤标识符
       run: |
-        echo "::group::🏗️ 编译日志"
-        cd $GITHUB_WORKSPACE/immortalwrt
-        
-        # 编译固件，失败则单线程调试模式
-        make -j$(($(nproc) + 1)) || {
-          echo "⚠️ 多线程编译失败，单线程重试（调试模式）"
-          make -j1 V=s || {
-            echo "❌ 编译最终失败"
-            echo "status=failed" >> $GITHUB_OUTPUT
-            exit 1
-          }
-        }
-        
-        echo "status=success" >> $GITHUB_OUTPUT
+        echo "::group::🏗️ 编译日志 (详细模式)"
+        cd immortalwrt
+        # 多线程编译，失败后使用单线程详细模式
+        make -j$(($(nproc) + 1)) || make -j1 V=s
         echo "::endgroup::"
 
     # 第十一步：收集存储空间信息
     - name: 收集编译结果
-      if: ${{ cancelled() == false }}
+      if: (!cancelled())  # 仅在未取消时执行
       run: |
         echo "::group::📊 最终存储空间使用"
-        df -hT
+        df -hT  # 显示完整磁盘使用情况
         echo "::endgroup::"
         
-    # 第十二步：整理固件文件
+    # # 第十二步：上传bin目录（按需开启）
+    # - name: 上传bin目录
+    #   uses: actions/upload-artifact@main
+    #   if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+    #   with:
+    #     name: immortalwrt_bin${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}  # 动态生成名称
+    #     path: immortalwrt/bin  # 上传整个bin目录
+
+    # 第十三步：整理固件文件
     - name: 整理输出文件
       id: organize
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' && cancelled() == false && steps.compile.outputs.status == 'success' }}
+      if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
       run: |
-        # 生成文件日期标签
-        echo "FILE_DATE=$(date +'%Y%m%d')" >> $GITHUB_ENV
-        
-        # 定位固件目录
-        FIRMWARE_DIR=$(find $GITHUB_WORKSPACE/immortalwrt/bin/targets -type d -mindepth 2 -maxdepth 2 | head -n1)
-        if [ -z "$FIRMWARE_DIR" ]; then
-          echo "❌ 未找到固件输出目录"
-          exit 1
-        fi
-        
-        cd $FIRMWARE_DIR
-        rm -rf packages 2>/dev/null || true
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "status=success" >> $GITHUB_OUTPUT
+        cd immortalwrt/bin/targets/*/*  # 进入固件目录
+        rm -rf packages  # 删除软件包目录（节省空间）
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV  # 设置环境变量供后续步骤使用
+        echo "status=success" >> $GITHUB_OUTPUT  # 输出状态
 
-    # 第十三步：上传固件文件
+    # 第十四步：上传固件文件
     - name: 上传输出文件
-      uses: actions/upload-artifact@v4
-      if: ${{ steps.organize.outputs.status == 'success' && cancelled() == false }}
-      with:
-        name: immortalwrt_firmware_${{ env.DEVICE_NAME }}_${{ env.FILE_DATE }}
-        path: ${{ env.FIRMWARE }}
-
-    # 第十四步：生成发布日期标签
-    - name: 生成发布标签
-      id: tag
-      if: ${{ env.UPLOAD_RELEASE == 'true' && cancelled() == false && steps.compile.outputs.status == 'success' }}
-      run: |
-        # 检查设备名称是否为空
-        if [ -z "$DEVICE_NAME" ]; then
-          echo "❌ DEVICE_NAME环境变量为空"
-          exit 1
-        fi
-        
-        RELEASE_TAG=$(date +"%Y.%m.%d-%H%M")
-        echo "release_tag=$RELEASE_TAG" >> $GITHUB_OUTPUT
-        
-        # 生成发布说明
-        cat > release.txt << EOF
-# ImmortalWrt 固件发布 $RELEASE_TAG
-
-## 设备: $DEVICE_NAME
-## 分支: $BRANCH
-## 编译时间: $(date +'%Y-%m-%d %H:%M:%S %Z')
-EOF
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    # 第十五步：发布到GitHub Release
-    - name: 发布固件至 Release
-      uses: softprops/action-gh-release@v2
-      if: ${{ steps.tag.outputs.status == 'success' && cancelled() == false }}
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        name: ImmortalWrt ${{ env.DEVICE_NAME }} ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-        files: ${{ env.FIRMWARE }}/*
-        draft: false
-        prerelease: false
+        name: immortalwrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE }}  # 使用前一步设置的环境变量
 
-    # 第十六步：清理旧工作流运行（延迟执行，避免冲突）
-    - name: 删除工作流运行
-      if: ${{ cancelled() == false }}
-      uses: Mattraks/delete-workflow-runs@v2
+    # 第十五步：生成发布日期标签
+    - name: 生成发布标签
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        # 生成格式为 年.月.日-时分 的标签
+        echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_OUTPUT
+        # 创建发布说明文件
+        touch release.txt
+        # 如果启用GoFile上传，添加链接（示例条件判断）
+        [ ${UPLOAD_GOFILE} = true && ${{ steps.gofile.outputs.url }} ] && echo "🔗 [GoFile](${{ steps.gofile.outputs.url }})" >> release.txt
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    # 第十六步：发布到GitHub Release
+    - name: 发布固件至 Release
+      uses: softprops/action-gh-release@master
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # 使用自动生成的令牌
       with:
-        retain_days: 0
-        keep_minimum_runs: 2
-        exclude_current_runs: true
+        tag_name: ${{ steps.tag.outputs.release_tag }}  # 动态标签名
+        body_path: release.txt  # 发布说明文件
+        files: ${{ env.FIRMWARE }}/*  # 上传所有固件文件
+
+    # 第十七步：清理旧工作流运行
+    - name: 删除工作流运行
+      uses: Mattraks/delete-workflow-runs@main
+      with:
+        retain_days: 0  # 保留0天前的记录
+        keep_minimum_runs: 2  # 至少保留2次运行记录
+        # 新增排除当前运行参数
+        exclude_current_runs: true  # 防止误删正在运行的工作流
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}       
 
-    # 第十七步：清理旧版本发布（增加延迟，确保新版本发布完成）
+    # 第十八步：清理旧版本发布
     - name: 删除旧版本
-      uses: dev-drprasad/delete-older-releases@v0.3.4
-      if: ${{ env.UPLOAD_RELEASE == 'true' && cancelled() == false && steps.tag.outputs.status == 'success' }}
+      uses: dev-drprasad/delete-older-releases@master
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
-        keep_latest: 5
-        delete_tags: true
+        keep_latest: 5  # 保留最新5个发布
+        delete_tags: true  # 同时删除关联的标签
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
