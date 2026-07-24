@@ -40,3 +40,10 @@ sed -i 's/LEDE/N60Pro/g' package/base-files/files/bin/config_generate
  #git clone https://github.com/CHN-beta/rkp-ipid package/rkp-ipid
  #curl -sSL https://raw.githubusercontent.com/chenmozhijin/turboacc/luci/add_turboacc.sh -o add_turboacc.sh && bash add_turboacc.sh
  #git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-partexp
+
+ #添加luci-app-store
+echo >> feeds.conf.default
+echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
+./scripts/feeds update istore
+./scripts/feeds install -d y -p istore luci-app-store
+
