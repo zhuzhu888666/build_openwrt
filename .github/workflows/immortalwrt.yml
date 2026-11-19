@@ -168,8 +168,10 @@ jobs:
         
         # 执行第二阶段自定义脚本
         chmod +x $DIY_P2_SH
+        chmod +x disable-rust-ci-llvm.sh
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
+        $GITHUB_WORKSPACE/disable-rust-ci-llvm.sh
         echo "::endgroup::"
         
     # 第九步：下载依赖包
