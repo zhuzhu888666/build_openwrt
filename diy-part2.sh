@@ -46,4 +46,10 @@ echo >> feeds.conf.default
 echo 'src-git istore https://github.com/linkease/istore;main' >> feeds.conf.default
 ./scripts/feeds update istore
 ./scripts/feeds install -d y -p istore luci-app-store
-
+# 禁用 Rust download-ci-llvm，规避 rust-dev CI 产物 404
+if [ -f ./disable-rust-ci-llvm.sh ]; then
+    chmod +x ./disable-rust-ci-llvm.sh
+    ./disable-rust-ci-llvm.sh
+else
+    echo "[WARN] disable-rust-ci-llvm.sh 不存在，跳过 Rust CI LLVM 禁用"
+fi
